@@ -6,7 +6,7 @@
 #
 # Build:  docker build -t avatar-gen:latest .
 # Run:    docker run --gpus all -p 8000:8000 -v /workspace:/workspace avatar-gen:latest
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -20,22 +20,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
 
-# --- system libs (match RESTORE.sh) ---
+# --- system libs (minimal — pytorch base already has python3.11 + pip + torch) ---
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        software-properties-common && \
-    add-apt-repository -y ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.11 python3.11-dev python3.11-distutils \
         git wget curl ca-certificates \
         build-essential libjpeg-dev libgl1 libglib2.0-0 \
         libosmesa6-dev libglu1-mesa && \
     rm -rf /var/lib/apt/lists/* && \
-    ln -sf /usr/bin/python3.11 /usr/local/bin/python3 && \
-    ln -sf /usr/bin/python3.11 /usr/local/bin/python && \
-    wget -q https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py && \
-    python3.11 /tmp/get-pip.py && rm /tmp/get-pip.py && \
     printf '#!/bin/bash\nexec "$@"\n' > /usr/local/bin/sudo && \
     chmod +x /usr/local/bin/sudo
 
@@ -48,7 +39,7 @@ RUN pip install --no-cache-dir --no-deps \
         basicsr==1.4.2 facexlib==0.3.0 realesrgan==0.3.0 gfpgan==1.3.8 && \
     pip install --no-cache-dir \
         opencv-python-headless>=4.11 \
-        addict future lmdb pyyaml requests scikit-image scipy tb-nightly tqdm yapf \
+        addict future lmdb pyyaml scikit-image scipy tb-nightly tqdm yapf \
         filterpy numba
 
 # --- Pre-bake enhancement weights so first request has zero cold-start ---
