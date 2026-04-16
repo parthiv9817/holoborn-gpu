@@ -1,0 +1,50 @@
+# avatar-gen — one-command launcher.
+#
+# Usage:
+#   docker compose up --build      # build image + start server
+#   docker compose up -d            # start in background
+#   docker compose logs -f          # tail logs
+#   docker compose down             # stop
+#
+# Health check: curl http://localhost:8000/health
+# Generate:     curl -X POST -F image=@frame_00.jpg http://localhost:8000/generate -o avatar.glb
+#
+# Requires:
+#   - NVIDIA Container Toolkit (nvidia-docker2) installed on host
+#   - /workspace populated with TRELLIS.2/, trellis_hf_cache/, .snapshot/
+#     (RunPod persistent volume layout — see Dockerfile header)
+
+services:
+  avatar-gen:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: avatar-gen:latest
+    container_name: avatar-gen
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the host workspace as the container workspace so live edits
+      # to server.py / preprocess.py / run_inference.py persist without rebuild.
+      - /workspace:/workspace
+    environment:
+      # Override the Dockerfile defaults here if you ever need online HF access:
+      # HF_HUB_OFFLINE: "0"
+      # TRANSFORMERS_OFFLINE: "0"
+      # HF_TOKEN: "hf_xxx"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
