@@ -21,11 +21,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRANSFORMERS_OFFLINE=1
 
 # --- system libs (minimal — pytorch base already has python3.11 + pip + torch) ---
+# NOTE: libosmesa6-dev + libglu1-mesa are installed by RESTORE.sh at runtime
+# from the pod volume. Excluded here to avoid apt timeouts in CI.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git wget curl ca-certificates \
-        build-essential libjpeg-dev libgl1 libglib2.0-0 \
-        libosmesa6-dev libglu1-mesa && \
+        build-essential libjpeg-dev libgl1 libglib2.0-0 && \
     rm -rf /var/lib/apt/lists/* && \
     printf '#!/bin/bash\nexec "$@"\n' > /usr/local/bin/sudo && \
     chmod +x /usr/local/bin/sudo
