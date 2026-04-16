@@ -21,21 +21,27 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRANSFORMERS_OFFLINE=1
 
 # --- system libs (match RESTORE.sh) ---
-RUN apt-get update -qq && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        python3.11 python3.11-dev python3-pip \
+        software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.11 python3.11-dev python3.11-distutils \
         git wget curl ca-certificates \
         build-essential libjpeg-dev libgl1 libglib2.0-0 \
         libosmesa6-dev libglu1-mesa && \
     rm -rf /var/lib/apt/lists/* && \
     ln -sf /usr/bin/python3.11 /usr/local/bin/python3 && \
     ln -sf /usr/bin/python3.11 /usr/local/bin/python && \
+    wget -q https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py && \
+    python3.11 /tmp/get-pip.py && rm /tmp/get-pip.py && \
     printf '#!/bin/bash\nexec "$@"\n' > /usr/local/bin/sudo && \
     chmod +x /usr/local/bin/sudo
 
 # --- FastAPI stack (torch + TRELLIS deps come from dist_packages.tar at runtime) ---
 RUN pip install --no-cache-dir \
-        fastapi uvicorn[standard] python-multipart
+        fastapi uvicorn[standard] python-multipart runpod requests
 
 # --- Enhancement deps, --no-deps to avoid torch downgrade ---
 RUN pip install --no-cache-dir --no-deps \
@@ -58,6 +64,7 @@ RUN mkdir -p /root/.cache/realesrgan /opt/gfpgan/weights && \
 
 # --- App code ---
 COPY server.py        /opt/app/server.py
+COPY handler.py       /opt/app/handler.py
 COPY preprocess.py    /opt/app/preprocess.py
 COPY run_inference.py /opt/app/run_inference.py
 COPY entrypoint.sh    /opt/app/entrypoint.sh
