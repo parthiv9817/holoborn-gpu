@@ -101,6 +101,24 @@ for f in server.py preprocess.py run_inference.py; do
 done
 cp /opt/app/handler.py /workspace/handler.py
 
+log "=== DIAG: what does the worker actually see on the volume? ==="
+echo "--- /workspace is: ---"
+ls -la /workspace 2>&1 | head -3
+echo "--- /workspace/TRELLIS.2/trellis2/representations/__init__.py ---"
+ls -la /workspace/TRELLIS.2/trellis2/representations/__init__.py 2>&1
+echo "  md5: $(md5sum /workspace/TRELLIS.2/trellis2/representations/__init__.py 2>&1)"
+echo "  size: $(stat -c%s /workspace/TRELLIS.2/trellis2/representations/__init__.py 2>&1)"
+echo "  content:"
+cat /workspace/TRELLIS.2/trellis2/representations/__init__.py 2>&1 | sed 's/^/    /'
+echo "--- /runpod-volume/TRELLIS.2/trellis2/representations/__init__.py (direct, not via symlink) ---"
+ls -la /runpod-volume/TRELLIS.2/trellis2/representations/__init__.py 2>&1
+echo "  md5: $(md5sum /runpod-volume/TRELLIS.2/trellis2/representations/__init__.py 2>&1)"
+echo "--- representations/ dir listing ---"
+ls -la /workspace/TRELLIS.2/trellis2/representations/ 2>&1
+echo "--- representations/mesh/__init__.py ---"
+cat /workspace/TRELLIS.2/trellis2/representations/mesh/__init__.py 2>&1 | sed 's/^/    /'
+echo "=== END DIAG ==="
+
 log "running pre-handler import diagnostic..."
 python3 -c "
 import sys
