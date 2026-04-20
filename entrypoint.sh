@@ -13,6 +13,9 @@ if [[ -d /runpod-volume/.snapshot ]]; then
     # /workspace exists as the WORKDIR from Dockerfile but is empty on serverless
     rm -rf /workspace
     ln -sf /runpod-volume /workspace
+    # Point PYTHONPATH at the real path rather than the symlink. Cheap insurance
+    # against any import-path-resolution oddities with lazy __getattr__ loaders.
+    export PYTHONPATH=/runpod-volume/TRELLIS.2
 fi
 
 if [[ ! -f /workspace/.snapshot/dist_packages.tar ]]; then
@@ -88,6 +91,16 @@ for f in server.py preprocess.py run_inference.py; do
     fi
 done
 cp /opt/app/handler.py /workspace/handler.py
+
+log "running pre-handler import diagnostic..."
+python3 -c "
+import sys
+sys.path.insert(0, '/runpod-volume/TRELLIS.2')
+from trellis2.representations import Mesh, MeshWithVoxel
+print('[diag] Mesh import OK:', Mesh)
+from trellis2.pipelines import Trellis2ImageTo3DPipeline
+print('[diag] Pipeline import OK:', Trellis2ImageTo3DPipeline)
+" || echo '[diag] IMPORT FAILED — see traceback above'
 
 log "starting RunPod serverless handler..."
 exec python3 /workspace/handler.py
