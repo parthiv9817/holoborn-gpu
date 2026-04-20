@@ -18,6 +18,15 @@ if [[ -d /runpod-volume/.snapshot ]]; then
     export PYTHONPATH=/runpod-volume/TRELLIS.2
 fi
 
+# Mirror stdout+stderr to a file on the volume so the full boot log survives
+# container death. Retrievable from outside via the volume's S3 endpoint.
+# RunPod's Container Logs UI is not always accessible; this is the fallback.
+if touch /workspace/.boot.log 2>/dev/null; then
+    : > /workspace/.boot.log  # truncate on each boot
+    exec > >(tee -a /workspace/.boot.log) 2>&1
+    log "boot log mirrored to /workspace/.boot.log (also stdout)"
+fi
+
 if [[ ! -f /workspace/.snapshot/dist_packages.tar ]]; then
     echo "ERROR: /workspace/.snapshot/dist_packages.tar not found."
     echo "Mount the persistent pod volume at /workspace (must contain TRELLIS.2/, trellis_hf_cache/, .snapshot/)."
