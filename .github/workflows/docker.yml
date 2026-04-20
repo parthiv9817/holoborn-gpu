@@ -26,7 +26,7 @@ jobs:
           context: .
           push: true
           tags: |
-            parthiv8421/holoborn-gpu:v2
+            parthiv8421/holoborn-gpu:v3
             parthiv8421/holoborn-gpu:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

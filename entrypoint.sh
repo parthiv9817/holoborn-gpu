@@ -1,41 +1,77 @@
 #!/bin/bash
-# entrypoint: restore TRELLIS from /workspace volume, seed weights, start uvicorn.
 set -euo pipefail
+
+PY_VER=3.11
+DIST_DIR=/usr/local/lib/python${PY_VER}/dist-packages
 
 log() { printf '\033[1;32m[entry]\033[0m %s\n' "$*"; }
 
-# --- 1. sanity-check the mounted volume ---
 if [[ ! -f /workspace/.snapshot/dist_packages.tar ]]; then
     echo "ERROR: /workspace/.snapshot/dist_packages.tar not found."
     echo "Mount the persistent pod volume at /workspace (must contain TRELLIS.2/, trellis_hf_cache/, .snapshot/)."
     exit 1
 fi
 
-# --- 2. restore TRELLIS python packages + HF cache + DINOv3 patch ---
-# RESTORE.sh is idempotent and handles apt / dist-packages / HF symlinks / patch
-log "running RESTORE.sh (idempotent)..."
-bash /workspace/.snapshot/RESTORE.sh
+log "restoring dist-packages from tar (~7 GB)..."
+mkdir -p "$(dirname ${DIST_DIR})"
+tar -xf /workspace/.snapshot/dist_packages.tar -C /usr/local/lib/python${PY_VER}
+log "dist-packages restored"
 
-# --- 3. seed pre-baked enhancement weights into the CWD-relative paths
-#        that facexlib + gfpgan look at (they use os.getcwd()). ---
+DEGRADATIONS="${DIST_DIR}/basicsr/data/degradations.py"
+if [[ -f "$DEGRADATIONS" ]]; then
+    sed -i 's/from torchvision.transforms.functional_tensor import rgb_to_grayscale/from torchvision.transforms.functional import rgb_to_grayscale/' "$DEGRADATIONS" 2>/dev/null || true
+fi
+
+log "linking HF cache..."
+mkdir -p /root/.cache
+rm -rf /root/.cache/huggingface 2>/dev/null || true
+ln -s /workspace/trellis_hf_cache /root/.cache/huggingface
+
+HUB=/workspace/trellis_hf_cache/hub
+if [[ -d "${HUB}/models--1038lab--RMBG-2.0" ]] && [[ ! -d "${HUB}/models--briaai--RMBG-2.0" ]]; then
+    ln -s models--1038lab--RMBG-2.0 "${HUB}/models--briaai--RMBG-2.0"
+fi
+if [[ -d "${HUB}/models--camenduru--dinov3-vitl16-pretrain-lvd1689m" ]] && [[ ! -d "${HUB}/models--facebook--dinov3-vitl16-pretrain-lvd1689m" ]]; then
+    ln -s models--camenduru--dinov3-vitl16-pretrain-lvd1689m "${HUB}/models--facebook--dinov3-vitl16-pretrain-lvd1689m"
+fi
+log "HF cache linked"
+
+PATCH_FILE=/workspace/TRELLIS.2/trellis2/modules/image_feature_extractor.py
+if [[ -f "$PATCH_FILE" ]] && ! grep -q 'hasattr(self.model, "layer")' "$PATCH_FILE" 2>/dev/null; then
+    log "applying DINOv3 layer-attribute patch..."
+    python3 - <<'PYEOF'
+p = '/workspace/TRELLIS.2/trellis2/modules/image_feature_extractor.py'
+s = open(p).read()
+old = 'for i, layer_module in enumerate(self.model.layer):'
+new = ('_layers = self.model.layer if hasattr(self.model, "layer") '
+       'else self.model.model.layer\n'
+       '        for i, layer_module in enumerate(_layers):')
+if old in s:
+    open(p, 'w').write(s.replace(old, new))
+    print('patched')
+else:
+    print('patch target not found — already patched or source changed')
+PYEOF
+fi
+
 log "seeding enhancement weights..."
 mkdir -p /workspace/gfpgan/weights
-cp -n /opt/gfpgan/weights/detection_Resnet50_Final.pth /workspace/gfpgan/weights/
-cp -n /opt/gfpgan/weights/parsing_parsenet.pth         /workspace/gfpgan/weights/
-cp -n /opt/gfpgan/weights/GFPGANv1.3.pth               /workspace/gfpgan/weights/ 2>/dev/null || true
+cp -n /opt/gfpgan/weights/detection_Resnet50_Final.pth /workspace/gfpgan/weights/ 2>/dev/null || true
+cp -n /opt/gfpgan/weights/parsing_parsenet.pth /workspace/gfpgan/weights/ 2>/dev/null || true
+cp -n /opt/gfpgan/weights/GFPGANv1.3.pth /workspace/gfpgan/weights/ 2>/dev/null || true
 mkdir -p /root/.cache/realesrgan
-cp -n /opt/gfpgan/weights/GFPGANv1.3.pth /root/.cache/gfpgan/GFPGANv1.3.pth 2>/dev/null || \
-    (mkdir -p /root/.cache/gfpgan && cp /opt/gfpgan/weights/GFPGANv1.3.pth /root/.cache/gfpgan/)
+mkdir -p /root/.cache/gfpgan
+cp -n /opt/gfpgan/weights/GFPGANv1.3.pth /root/.cache/gfpgan/GFPGANv1.3.pth 2>/dev/null || true
 
-# --- 4. start the FastAPI server from /workspace so CWD-relative paths resolve ---
-log "starting uvicorn on :8000 ..."
+log "seeding app code..."
 cd /workspace
-# Seed app code onto the volume if missing — the volume copy is authoritative
-# once present, so live edits persist across container restarts.
 for f in server.py preprocess.py run_inference.py; do
     if [[ ! -f /workspace/$f ]]; then
         log "no /workspace/$f — using baked copy"
         cp /opt/app/$f /workspace/$f
     fi
 done
-exec python3 -m uvicorn server:app --host 0.0.0.0 --port 8000 --log-level info
+cp /opt/app/handler.py /workspace/handler.py
+
+log "starting RunPod serverless handler..."
+exec python3 /workspace/handler.py

@@ -1,12 +1,5 @@
-# Avatar-gen server image.
-#
-# Design: /workspace is a RunPod persistent volume supplying TRELLIS.2/,
-# trellis_hf_cache/, and .snapshot/dist_packages.tar. This image bakes
-# everything else so a fresh pod boots to a warm server without manual steps.
-#
-# Build:  docker build -t avatar-gen:latest .
-# Run:    docker run --gpus all -p 8000:8000 -v /workspace:/workspace avatar-gen:latest
-FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+# Avatar-gen server image (serverless).
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -20,30 +13,22 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
 
-# --- system libs (minimal — pytorch base already has python3.11 + pip + torch) ---
-# NOTE: libosmesa6-dev + libglu1-mesa are installed by RESTORE.sh at runtime
-# from the pod volume. Excluded here to avoid apt timeouts in CI.
-RUN apt-get update && \
+RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        git wget curl ca-certificates \
-        build-essential libjpeg-dev libgl1 libglib2.0-0 && \
+        python3.11 python3.11-dev python3-pip \
+        git build-essential ca-certificates wget \
+        libosmesa6-dev libglu1-mesa libgl1 libglib2.0-0 libjpeg-dev && \
     rm -rf /var/lib/apt/lists/* && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python && \
     printf '#!/bin/bash\nexec "$@"\n' > /usr/local/bin/sudo && \
     chmod +x /usr/local/bin/sudo
 
-# --- FastAPI stack (torch + TRELLIS deps come from dist_packages.tar at runtime) ---
 RUN pip install --no-cache-dir \
-        fastapi uvicorn[standard] python-multipart runpod requests
+        fastapi uvicorn[standard] python-multipart \
+        runpod requests \
+        opencv-python-headless Pillow numpy
 
-# --- Enhancement deps, --no-deps to avoid torch downgrade ---
-RUN pip install --no-cache-dir --no-deps \
-        basicsr==1.4.2 facexlib==0.3.0 realesrgan==0.3.0 gfpgan==1.3.8 && \
-    pip install --no-cache-dir \
-        opencv-python-headless>=4.11 \
-        addict future lmdb pyyaml scikit-image scipy tb-nightly tqdm yapf \
-        filterpy numba
-
-# --- Pre-bake enhancement weights so first request has zero cold-start ---
 RUN mkdir -p /root/.cache/realesrgan /opt/gfpgan/weights && \
     wget -q -O /root/.cache/realesrgan/RealESRGAN_x2plus.pth \
         https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth && \
@@ -54,11 +39,10 @@ RUN mkdir -p /root/.cache/realesrgan /opt/gfpgan/weights && \
     wget -q -O /opt/gfpgan/weights/parsing_parsenet.pth \
         https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth
 
-# --- App code ---
 COPY server.py        /opt/app/server.py
-COPY handler.py       /opt/app/handler.py
 COPY preprocess.py    /opt/app/preprocess.py
 COPY run_inference.py /opt/app/run_inference.py
+COPY handler.py       /opt/app/handler.py
 COPY entrypoint.sh    /opt/app/entrypoint.sh
 RUN chmod +x /opt/app/entrypoint.sh
 
