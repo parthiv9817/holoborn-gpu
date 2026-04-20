@@ -138,15 +138,6 @@ echo "--- column-0 'def ' lines (regex should match these) ---"
 grep -n "^def " "$F" | head -5
 echo "--- is @triton.jit on line 86? ---"
 sed -n '84,88p' "$F"
-echo "--- inspect.getsource self-test on a trivial fn ---"
-python3 -c "
-import inspect, re
-def simple():
-    pass
-src = inspect.getsource(simple)
-m = re.search(r'^def\s+\w+\s*\(', src, re.MULTILINE)
-print('simple fn src:', repr(src[:60]), 'regex:', m)
-" 2>&1
 echo "=== END extended DIAG ==="
 
 log "running pre-handler import diagnostic (direct, no lazy loader)..."
