@@ -76,8 +76,10 @@ RUN mkdir -p /root/.cache/realesrgan /root/.cache/gfpgan /opt/gfpgan/weights && 
     wget -q -O /opt/gfpgan/weights/parsing_parsenet.pth \
         https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth
 
-# flash-attn (prebuilt wheel for cu124+py311+torch2.6 — falls back to source build if missing)
-RUN pip install --no-cache-dir flash-attn==2.7.3
+# flash-attn. --no-build-isolation lets setup.py see torch (needed to detect CUDA arch).
+# packaging + wheel pre-installed so build_meta can bootstrap without isolation.
+RUN pip install --no-cache-dir packaging wheel ninja && \
+    pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation
 
 # nvdiffrast from source (NVlabs; not on PyPI)
 RUN git clone --depth 1 -b v0.4.0 https://github.com/NVlabs/nvdiffrast.git /tmp/nvdiffrast && \
