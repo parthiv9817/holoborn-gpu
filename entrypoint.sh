@@ -119,15 +119,23 @@ echo "--- representations/mesh/__init__.py ---"
 cat /workspace/TRELLIS.2/trellis2/representations/mesh/__init__.py 2>&1 | sed 's/^/    /'
 echo "=== END DIAG ==="
 
-log "running pre-handler import diagnostic..."
+log "running pre-handler import diagnostic (direct, no lazy loader)..."
 python3 -c "
-import sys
+import sys, traceback
 sys.path.insert(0, '/runpod-volume/TRELLIS.2')
-from trellis2.representations import Mesh, MeshWithVoxel
-print('[diag] Mesh import OK:', Mesh)
-from trellis2.pipelines import Trellis2ImageTo3DPipeline
-print('[diag] Pipeline import OK:', Trellis2ImageTo3DPipeline)
-" || echo '[diag] IMPORT FAILED — see traceback above'
+try:
+    from trellis2.representations.mesh import base
+    print('[diag] mesh.base import OK')
+except Exception as e:
+    print(f'[diag] mesh.base FAILED: {e}')
+    traceback.print_exc()
+try:
+    from trellis2.representations.mesh.base import Mesh
+    print(f'[diag] Mesh import OK: {Mesh}')
+except Exception as e:
+    print(f'[diag] Mesh direct FAILED: {e}')
+    traceback.print_exc()
+" || echo '[diag] DIAGNOSTIC SCRIPT CRASHED'
 
 log "starting RunPod serverless handler..."
 exec python3 /workspace/handler.py
