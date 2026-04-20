@@ -23,7 +23,7 @@ fi
 
 log "restoring dist-packages from tar (~7 GB)..."
 mkdir -p "$(dirname ${DIST_DIR})"
-tar -xf /workspace/.snapshot/dist_packages.tar -C /usr/local/lib/python${PY_VER}
+tar -xf /workspace/.snapshot/dist_packages.tar -C /usr/local/lib/python${PY_VER} --overwrite
 log "dist-packages restored"
 
 DEGRADATIONS="${DIST_DIR}/basicsr/data/degradations.py"
