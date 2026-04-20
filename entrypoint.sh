@@ -45,6 +45,13 @@ if [[ -d "${HUB}/models--camenduru--dinov3-vitl16-pretrain-lvd1689m" ]] && [[ ! 
 fi
 log "HF cache linked"
 
+# Nuke any __pycache__ that leaked onto the volume. Stale .pyc compiled from an
+# older version of the code would make modules look like the wrong shape
+# (e.g., "cannot import name 'Mesh' from trellis2.representations").
+# PYTHONDONTWRITEBYTECODE=1 keeps them from being recreated.
+log "clearing stale __pycache__ under /workspace/TRELLIS.2/..."
+find /workspace/TRELLIS.2 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
 PATCH_FILE=/workspace/TRELLIS.2/trellis2/modules/image_feature_extractor.py
 if [[ -f "$PATCH_FILE" ]] && ! grep -q 'hasattr(self.model, "layer")' "$PATCH_FILE" 2>/dev/null; then
     log "applying DINOv3 layer-attribute patch..."
