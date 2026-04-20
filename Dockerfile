@@ -14,13 +14,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRANSFORMERS_OFFLINE=1
 
 RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends software-properties-common gnupg && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        python3.11 python3.11-dev python3-pip \
+        python3.11 python3.11-dev python3.11-venv \
         git build-essential ca-certificates wget \
         libosmesa6-dev libglu1-mesa libgl1 libglib2.0-0 libjpeg-dev && \
     rm -rf /var/lib/apt/lists/* && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
     ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    wget -qO- https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     printf '#!/bin/bash\nexec "$@"\n' > /usr/local/bin/sudo && \
     chmod +x /usr/local/bin/sudo
 
