@@ -119,6 +119,36 @@ echo "--- representations/mesh/__init__.py ---"
 cat /workspace/TRELLIS.2/trellis2/representations/mesh/__init__.py 2>&1 | sed 's/^/    /'
 echo "=== END DIAG ==="
 
+log "=== DIAG: worker environment state ==="
+echo "--- python version ---"
+python3 --version
+python3 -c "import sys; print(sys.version_info)"
+echo "--- triton package ---"
+python3 -c "import triton; print('triton:', triton.__version__, 'at', triton.__file__)" 2>&1 | head -3
+echo "--- libtriton.so ---"
+F_LIBTRITON=/usr/local/lib/python3.11/dist-packages/triton/_C/libtriton.so
+ls -la "$F_LIBTRITON" 2>&1
+ldd "$F_LIBTRITON" 2>&1 | head -8
+echo "--- failing source file ---"
+F=/usr/local/lib/python3.11/dist-packages/flex_gemm/kernels/triton/spconv/sparse_submanifold_conv_bwd_implicit_gemm.py
+ls -la "$F" 2>&1
+md5sum "$F" 2>&1
+wc -l "$F" 2>&1
+echo "--- column-0 'def ' lines (regex should match these) ---"
+grep -n "^def " "$F" | head -5
+echo "--- is @triton.jit on line 86? ---"
+sed -n '84,88p' "$F"
+echo "--- inspect.getsource self-test on a trivial fn ---"
+python3 -c "
+import inspect, re
+def simple():
+    pass
+src = inspect.getsource(simple)
+m = re.search(r'^def\s+\w+\s*\(', src, re.MULTILINE)
+print('simple fn src:', repr(src[:60]), 'regex:', m)
+" 2>&1
+echo "=== END extended DIAG ==="
+
 log "running pre-handler import diagnostic (direct, no lazy loader)..."
 python3 -c "
 import sys, traceback
