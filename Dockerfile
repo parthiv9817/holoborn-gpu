@@ -50,8 +50,7 @@ RUN pip install --no-cache-dir runpod requests Pillow numpy
 # TRELLIS core deps (omit gradio — we don't serve a web UI)
 RUN pip install --no-cache-dir \
         imageio imageio-ffmpeg tqdm easydict opencv-python-headless ninja \
-        trimesh transformers tensorboard pandas lpips zstandard kornia timm \
-        pillow-simd && \
+        trimesh transformers tensorboard pandas lpips zstandard kornia timm && \
     pip install --no-cache-dir \
         git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
 
