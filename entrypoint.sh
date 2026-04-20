@@ -6,6 +6,15 @@ DIST_DIR=/usr/local/lib/python${PY_VER}/dist-packages
 
 log() { printf '\033[1;32m[entry]\033[0m %s\n' "$*"; }
 
+# --- 0. RunPod serverless mounts network volumes at /runpod-volume, not /workspace.
+#        Symlink so all downstream paths resolve. ---
+if [[ -d /runpod-volume/.snapshot ]]; then
+    log "network volume detected at /runpod-volume — linking to /workspace"
+    # /workspace exists as the WORKDIR from Dockerfile but is empty on serverless
+    rm -rf /workspace
+    ln -sf /runpod-volume /workspace
+fi
+
 if [[ ! -f /workspace/.snapshot/dist_packages.tar ]]; then
     echo "ERROR: /workspace/.snapshot/dist_packages.tar not found."
     echo "Mount the persistent pod volume at /workspace (must contain TRELLIS.2/, trellis_hf_cache/, .snapshot/)."
