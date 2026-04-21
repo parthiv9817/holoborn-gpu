@@ -13,9 +13,12 @@ Optional keys:
     skip_enhance (bool), skip_preprocess (bool)
 
 Output:
-    { "glb_b64": "<base64>",
+    { "glb_volume_path": "outputs/<job_id>.glb",
       "glb_size_bytes": int,
       "elapsed_seconds": float }
+
+The GLB is written to the network volume at /runpod-volume/outputs/<job_id>.glb.
+Callers fetch it via the RunPod S3 API (bucket matches the volume ID).
 """
 import base64
 import gc
@@ -107,15 +110,22 @@ def handler(job):
                 pipeline_type=pipeline_type,
             )
 
-            with open(out_path, "rb") as f:
-                glb_bytes = f.read()
+            job_id = job.get("id") or f"nojobid-{int(t_start)}"
+            out_dir = "/runpod-volume/outputs"
+            os.makedirs(out_dir, exist_ok=True)
+            glb_rel = f"outputs/{job_id}.glb"
+            glb_abs = f"/runpod-volume/{glb_rel}"
+            with open(out_path, "rb") as src, open(glb_abs, "wb") as dst:
+                dst.write(src.read())
+            glb_size = os.path.getsize(glb_abs)
+            print(f"[handler] wrote GLB to {glb_abs} ({glb_size} bytes)", flush=True)
     except Exception as e:
         traceback.print_exc()
         return {"error": f"pipeline failed: {e}"}
 
     return {
-        "glb_b64": base64.b64encode(glb_bytes).decode("ascii"),
-        "glb_size_bytes": len(glb_bytes),
+        "glb_volume_path": glb_rel,
+        "glb_size_bytes": glb_size,
         "elapsed_seconds": round(time.time() - t_start, 2),
     }
 
