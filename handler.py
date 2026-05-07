@@ -10,7 +10,13 @@ Input:
     { "image_url": "https://..." }
 Optional keys:
     seed, decimation, texture_size, pipeline_type,
-    skip_enhance (bool), skip_preprocess (bool)
+    skip_enhance (bool), skip_preprocess (bool),
+    sparse_struct_guidance (float, default 8.0),
+    sparse_struct_steps (int, default 12),
+    shape_slat_guidance (float, default 8.0),
+    shape_slat_steps (int, default 12),
+    tex_slat_guidance (float, default 1.0),
+    tex_slat_steps (int, default 12)
 
 Output:
     { "glb_volume_path": "outputs/<job_id>.glb",
@@ -74,6 +80,12 @@ def handler(job):
     pipeline_type = inp.get("pipeline_type", "1536_cascade")
     skip_enhance = bool(inp.get("skip_enhance", False))
     skip_preprocess = bool(inp.get("skip_preprocess", False))
+    sparse_struct_guidance = float(inp.get("sparse_struct_guidance", 8.0))
+    sparse_struct_steps = int(inp.get("sparse_struct_steps", 12))
+    shape_slat_guidance = float(inp.get("shape_slat_guidance", 8.0))
+    shape_slat_steps = int(inp.get("shape_slat_steps", 12))
+    tex_slat_guidance = float(inp.get("tex_slat_guidance", 1.0))
+    tex_slat_steps = int(inp.get("tex_slat_steps", 12))
 
     try:
         img_bytes = _fetch_image(inp)
@@ -108,6 +120,12 @@ def handler(job):
                 decimation_target=decimation,
                 texture_size=texture_size,
                 pipeline_type=pipeline_type,
+                sparse_struct_guidance=sparse_struct_guidance,
+                sparse_struct_steps=sparse_struct_steps,
+                shape_slat_guidance=shape_slat_guidance,
+                shape_slat_steps=shape_slat_steps,
+                tex_slat_guidance=tex_slat_guidance,
+                tex_slat_steps=tex_slat_steps,
             )
 
             job_id = job.get("id") or f"nojobid-{int(t_start)}"

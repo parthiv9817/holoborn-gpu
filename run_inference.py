@@ -47,21 +47,6 @@ import o_voxel  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from preprocess import preprocess_raw, autocrop_square_from_alpha  # noqa: E402
 
-SAMPLER_PARAMS = dict(
-    sparse_structure_sampler_params={
-        "steps": 12, "guidance_strength": 8.0,
-        "guidance_rescale": 0.7, "rescale_t": 5.0,
-    },
-    shape_slat_sampler_params={
-        "steps": 12, "guidance_strength": 8.0,
-        "guidance_rescale": 0.5, "rescale_t": 3.0,
-    },
-    tex_slat_sampler_params={
-        "steps": 12, "guidance_strength": 1.0,
-        "guidance_rescale": 0.0, "rescale_t": 3.0,
-    },
-)
-
 
 def load_enhancer():
     model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64,
@@ -137,12 +122,33 @@ def rembg_to_cutout(pipeline, pil_image):
 
 
 def generate_glb(pipeline, cutout, output_path, *, seed,
-                 decimation_target, texture_size, pipeline_type):
+                 decimation_target, texture_size, pipeline_type,
+                 sparse_struct_guidance=8.0, sparse_struct_steps=12,
+                 shape_slat_guidance=8.0, shape_slat_steps=12,
+                 tex_slat_guidance=1.0, tex_slat_steps=12):
+    sampler_params = dict(
+        sparse_structure_sampler_params={
+            "steps": sparse_struct_steps,
+            "guidance_strength": sparse_struct_guidance,
+            "guidance_rescale": 0.7, "rescale_t": 5.0,
+        },
+        shape_slat_sampler_params={
+            "steps": shape_slat_steps,
+            "guidance_strength": shape_slat_guidance,
+            "guidance_rescale": 0.5, "rescale_t": 3.0,
+        },
+        tex_slat_sampler_params={
+            "steps": tex_slat_steps,
+            "guidance_strength": tex_slat_guidance,
+            "guidance_rescale": 0.0, "rescale_t": 3.0,
+        },
+    )
+
     t0 = time.time()
     outputs = pipeline.run(
         cutout, seed=seed, preprocess_image=True,
         pipeline_type=pipeline_type, return_latent=True,
-        **SAMPLER_PARAMS,
+        **sampler_params,
     )
     shape_slat, tex_slat, res = outputs[1]
     print(f"[gen] {time.time()-t0:.1f}s, res={res}")
